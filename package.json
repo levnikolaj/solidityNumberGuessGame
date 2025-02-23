@@ -1,0 +1,11 @@
+{
+  "name": "soliditynumberguessgame",
+  "version": "1.0.0",
+  "description": "A solidity contract that allows someone to guess a number for a reward",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Lev Kavs",
+  "license": "MIT"
+}
