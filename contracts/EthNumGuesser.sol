@@ -10,15 +10,17 @@ contract EthNumGuesser is VRFManager, Ownable {
   uint256 public immutable maxNumber; // TODO: is this needed?
   uint256 public minimumGasPerGuess = 0.0001 ether;
   uint256 public ownerContribution;
+  bool public dailyNumberGuessed;
 
   mapping(address => uint256) private lastGuessTime; 
-  mapping(address => uint256) private userGuesses; 
+  mapping(address => uint256) private userGuesses;
 
   // events
   event NumberGenerated(uint256 timestamp);
   event GuessMade(address indexed player, uint256 guess, bool correct);
   event MinimumGasPerGuessUpdated(uint256 newGasPrice);
   event ContractFunded(address indexed owner, uint256 amount);
+  event DailyNumberGuessed(uint256 winningNumber, address winner);
 
   constructor(address _vrfCoordinator, bytes32 _keyHash, uint256 _maxNumber) 
     VRFManager(_vrfCoordinator, _keyHash) 
@@ -26,6 +28,10 @@ contract EthNumGuesser is VRFManager, Ownable {
   {
     require(_maxNumber > 1, "Max number must be greater than 1");
     maxNumber = _maxNumber;
+  }
+
+  function hasDailyNumberBeenGuessed() public view returns (bool) {
+    return dailyNumberGuessed;
   }
 
   function getContractBalance() public view returns (uint256) {
@@ -44,7 +50,15 @@ contract EthNumGuesser is VRFManager, Ownable {
     emit NumberGenerated(lastGenerated);
   }
 
+  function canMakeGuess() public view returns (bool) {
+    return !dailyNumberGuessed;
+  }
+
   function makeGuess(uint256 _guess) public payable {
+    if (dailyNumberGuessed) {
+      revert("Daily number has already been guessed"); // saving gas
+    }
+
     require(msg.value >= minimumGasPerGuess, "Insufficient ETH sent");
     require(block.timestamp >= lastGuessTime[msg.sender] + 1 days, "Can only guess once per 24 hours");
     require(_guess > 0 && _guess <= maxNumber, "Invalid guess");
@@ -53,6 +67,11 @@ contract EthNumGuesser is VRFManager, Ownable {
     userGuesses[msg.sender] = _guess;
 
     bool correct = (_guess == dailyNumber);
+    if (correct) {
+      dailyNumberGuessed = true;
+      emit DailyNumberGuessed(dailyNumber, msg.sender);
+    }
+
     emit GuessMade(msg.sender, _guess, correct);
   }
 
