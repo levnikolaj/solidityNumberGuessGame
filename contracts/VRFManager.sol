@@ -34,9 +34,10 @@ contract VRFManager is VRFConsumerBaseV2 {
     emit RandomNumberRequested(requestId);
   }
 
+  // NOTE: chainlink calls this for us! after we call requestRandomNumber
   function fulfillRandomWords(uint256, uint256[] memory randomWords) internal override {
     randomNumber = randomWords[0];
-    emit RandomNumberReceived(randomNumber);
+    _updateDailyNumber();
   }
 
   function _updateDailyNumber() internal virtual {}

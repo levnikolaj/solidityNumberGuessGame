@@ -2,13 +2,15 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@chainlink/contracts/src/v0.8/automation/AutomationCompatible.sol";
 import "./VRFManager.sol";
 
-contract EthNumGuesser is VRFManager, Ownable {
+contract EthNumGuesser is VRFManager, AutomationCompatible, Ownable {
   uint256 private dailyNumber;
   uint256 public lastGenerated; 
   uint256 public immutable maxNumber; // TODO: is this needed?
-  uint256 public minimumGasPerGuess = 0.0001 ether;
+  uint256 public minGasPerGuess = 0.0001 ether;
+  uint256 public minContractBalance = 1 ether;
   uint256 public ownerContribution;
   bool public dailyNumberGuessed;
 
@@ -18,14 +20,12 @@ contract EthNumGuesser is VRFManager, Ownable {
   // events
   event NumberGenerated(uint256 timestamp);
   event GuessMade(address indexed player, uint256 guess, bool correct);
-  event MinimumGasPerGuessUpdated(uint256 newGasPrice);
+  event MinGasPerGuessUpdated(uint256 newGasPrice);
   event ContractFunded(address indexed owner, uint256 amount);
   event DailyNumberGuessed(uint256 winningNumber, address winner);
+  event WinningsDistributed(address indexed winner, uint256 amount);
 
-  constructor(address _vrfCoordinator, bytes32 _keyHash, uint256 _maxNumber) 
-    VRFManager(_vrfCoordinator, _keyHash) 
-    Ownable(msg.sender) 
-  {
+  constructor(address _vrfCoordinator, bytes32 _keyHash, uint256 _maxNumber) VRFManager(_vrfCoordinator, _keyHash) Ownable(msg.sender) {
     require(_maxNumber > 1, "Max number must be greater than 1");
     maxNumber = _maxNumber;
   }
@@ -40,12 +40,14 @@ contract EthNumGuesser is VRFManager, Ownable {
 
   function generateNewNumber() public onlyOwner {
     require(block.timestamp >= lastGenerated + 1 days, "Can only generate once per day");
+    require(!dailyNumberGuessed, "Wait for previous game to reset");
     requestRandomNumber();
   }
 
   function _updateDailyNumber() internal override {
     require(randomNumber > 0, "Random number not set");
     dailyNumber = (randomNumber % maxNumber) + 1;
+    dailyNumberGuessed = false;
     lastGenerated = block.timestamp;
     emit NumberGenerated(lastGenerated);
   }
@@ -59,7 +61,7 @@ contract EthNumGuesser is VRFManager, Ownable {
       revert("Daily number has already been guessed"); // saving gas
     }
 
-    require(msg.value >= minimumGasPerGuess, "Insufficient ETH sent");
+    require(msg.value >= minGasPerGuess, "Insufficient ETH sent");
     require(block.timestamp >= lastGuessTime[msg.sender] + 1 days, "Can only guess once per 24 hours");
     require(_guess > 0 && _guess <= maxNumber, "Invalid guess");
 
@@ -75,10 +77,21 @@ contract EthNumGuesser is VRFManager, Ownable {
     emit GuessMade(msg.sender, _guess, correct);
   }
 
-  function setMinimumGasPerGuess(uint256 _newAmount) external onlyOwner {
+  function distributeWinnings(address winner) internal {
+    uint256 contractBalance = address(this).balance;
+    require(contractBalance > minContractBalance, "Not enough funds");
+
+    uint256 excessBalance = contractBalance - minContractBalance;
+    uint256 payout = (excessBalance * 40) / 100; // 40% of excess balance
+
+    payable(winner).transfer(payout);
+    emit WinningsDistributed(winner, payout);
+  }
+
+  function setMinGasPerGuess(uint256 _newAmount) external onlyOwner {
     require(_newAmount > 0, "Minimum gas must be greater than zero");
-    minimumGasPerGuess = _newAmount;
-    emit MinimumGasPerGuessUpdated(_newAmount);
+    minGasPerGuess = _newAmount;
+    emit MinGasPerGuessUpdated(_newAmount);
   }
 
   function fundContract() external payable onlyOwner {
@@ -87,7 +100,16 @@ contract EthNumGuesser is VRFManager, Ownable {
     emit ContractFunded(msg.sender, msg.value);
   }
 
-  // TODO: why do I need this?
+  function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory) {
+    upkeepNeeded = (block.timestamp >= lastGenerated + 1 days) && !dailyNumberGuessed;
+  }
+
+  function performUpkeep(bytes calldata) external override {
+    if(block.timestamp >= lastGenerated + 1 days && !dailyNumberGuessed) {
+      requestRandomNumber();
+    }
+  }
+
   receive() external payable {}
 }
 

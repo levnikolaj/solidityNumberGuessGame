@@ -4,7 +4,10 @@
   "description": "A solidity contract that allows someone to guess a number for a reward",
   "main": "index.js",
   "scripts": {
-    "test": "test"
+    "node": "npx hardhat node",
+    "compile": "npx hardhat compile",
+    "deploy-local": "npx hardhat ignition deploy ignition/modules/EthNumGuesser.js --network localhost",
+    "console": "npx hardhat console --network localhost"
   },
   "author": "Lev Kavs",
   "license": "MIT",
@@ -14,6 +17,8 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^1.3.0",
-    "@openzeppelin/contracts": "^5.2.0"
+    "@openzeppelin/contracts": "^5.2.0",
+    "dotenv": "^16.4.7",
+    "hardhat-deploy": "^1.0.1"
   }
 }
