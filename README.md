@@ -39,6 +39,7 @@ Before deploying the contract, make sure you have:
 ### **2️⃣ Install Dependencies**  
 ```sh
 npm install
+```
 
 ## 🎮 Player Functions
 
