@@ -49,7 +49,7 @@ contract EthNumGuesser is VRFManager, AutomationCompatible, Ownable, ReentrancyG
   /**
    * @dev Constructor initializes the contract with VRF setup and ownership.
    */
-  constructor(address _vrfCoordinator, bytes32 _keyHash, uint256 _maxNumber) VRFManager(_vrfCoordinator, _keyHash) Ownable(msg.sender) {}
+  constructor(address _vrfCoordinator, bytes32 _keyHash) VRFManager(_vrfCoordinator, _keyHash) Ownable(msg.sender) {}
 
   /**
    * @dev Returns whether the daily number has been guessed.
@@ -222,6 +222,9 @@ contract EthNumGuesser is VRFManager, AutomationCompatible, Ownable, ReentrancyG
    */
   function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory) {
     upkeepNeeded = (block.timestamp >= lastGenerated + 1 days) && !dailyNumberGuessed;
+
+    // Return the value of upkeepNeeded along with an empty byte array (since no additional data is needed)
+    return (upkeepNeeded, "");
   }
 
   /**
